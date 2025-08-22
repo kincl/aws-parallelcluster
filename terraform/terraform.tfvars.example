@@ -1,0 +1,35 @@
+# Example Terraform Variables for AWS ParallelCluster Infrastructure
+# Copy this file to terraform.tfvars and modify the values as needed
+
+# AWS Configuration
+aws_region = "us-east-2"
+
+# Cluster Configuration
+cluster_name = "my-pcluster"
+environment  = "dev"
+
+# Network Configuration
+vpc_cidr                = "10.0.0.0/16"
+head_node_subnet_cidr   = "10.0.1.0/24"
+compute_subnet_cidr     = "10.0.2.0/24"
+
+# Security Configuration
+# Restrict this to your IP range in production for better security
+ssh_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# EFS Configuration
+efs_encrypted         = true
+efs_performance_mode  = "generalPurpose"  # or "maxIO" for higher performance
+efs_throughput_mode   = "bursting"        # or "provisioned" for guaranteed throughput
+efs_provisioned_throughput = 100          # Only used if throughput_mode is "provisioned"
+
+# EFS Access Point Configuration
+efs_uid = 1001
+efs_gid = 1001
+
+# Additional Tags (optional)
+additional_tags = {
+  Project     = "ParallelCluster"
+  Owner       = "your-name"
+  CostCenter  = "research"
+}
