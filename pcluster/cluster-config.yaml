@@ -1,0 +1,38 @@
+Region: us-east-2
+Image:
+  Os: centos7
+  # CustomAmi: ami-0b75744612af63596
+HeadNode:
+  InstanceType: t2.micro
+  Networking:
+    SubnetId: subnet-01c7ba969dc365df0
+    ElasticIp: true
+  Ssh:
+    KeyName: jkincl
+Scheduling:
+  Scheduler: slurm
+  SlurmQueues:
+  - Name: micro
+    ComputeResources:
+    - Name: t2micro
+      InstanceType: t2.micro
+      MinCount: 0
+      MaxCount: 10
+    Networking:
+      SubnetIds:
+      - subnet-08be9ca3b8496064f
+  - Name: xlarge
+    ComputeResources:
+    - Name: c5xlarge
+      InstanceType: c5.xlarge
+      MinCount: 0
+      MaxCount: 5
+    Networking:
+      SubnetIds:
+      - subnet-08be9ca3b8496064f
+SharedStorage:
+  - MountDir: /shared
+    Name: shared-efs
+    StorageType: Efs
+    EfsSettings:
+      FileSystemId: fs-0a38c85e847b2ea2f

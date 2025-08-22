@@ -1,0 +1,15 @@
+Region: us-east-2
+Image:
+  Name: my-centos7
+  RootVolume:
+    Size: 35
+
+Build:
+  ParentImage: ami-01402c679c523d9c7
+  InstanceType: c5.xlarge
+  Components:
+    - Type: script
+      Value: s3://jkincl-pcluster/post_install.sh
+  SubnetId: subnet-0c5a0541c07e970f6
+  SecurityGroupIds:
+    - sg-06c8383adebde7ead
