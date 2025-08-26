@@ -1,0 +1,46 @@
+Region: ${region}
+Image:
+  Os: rhel9
+  # CustomAmi: ami-0b75744612af63596
+HeadNode:
+  InstanceType: m5a.large
+  Networking:
+    SubnetId: ${head_node_subnet_id}
+    ElasticIp: true
+    SecurityGroups:
+      - ${security_group_id}
+  Ssh:
+    KeyName: ${ssh_key_name}
+Scheduling:
+  Scheduler: slurm
+  SlurmSettings:
+    QueueUpdateStrategy: TERMINATE
+  SlurmQueues:
+  - Name: debug
+    ComputeResources:
+    - Name: c7i-flexlarge
+      InstanceType: c7i-flex.large
+      MinCount: 0
+      MaxCount: 5
+    Networking:
+      SubnetIds:
+      - ${compute_subnet_id}
+      SecurityGroups:
+        - ${security_group_id}
+  - Name: standard
+    ComputeResources:
+    - Name: c5xlarge
+      InstanceType: c5.xlarge
+      MinCount: 0
+      MaxCount: 5
+    Networking:
+      SubnetIds:
+      - ${compute_subnet_id}
+      SecurityGroups:
+        - ${security_group_id}
+SharedStorage:
+  - MountDir: /shared
+    Name: shared-efs
+    StorageType: Efs
+    EfsSettings:
+      FileSystemId: ${efs_file_system_id}

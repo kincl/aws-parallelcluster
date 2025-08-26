@@ -1,6 +1,6 @@
 # AWS ParallelCluster Infrastructure with Terraform
 
-This Terraform configuration creates the base infrastructure needed to deploy AWS ParallelCluster, including networking, security groups, and shared storage.
+This Terraform configuration creates the base infrastructure needed to deploy AWS ParallelCluster, including networking, security groups, shared storage, and custom AMI building via Image Builder.
 
 ## What This Creates
 
@@ -20,6 +20,11 @@ This Terraform configuration creates the base infrastructure needed to deploy AW
 - **EFS File System** with encryption enabled
 - **EFS Mount Targets** in both availability zones (one per AZ as required by AWS)
 - **EFS Access Point** for the `/shared` directory with proper permissions
+
+### Custom Image Building
+- **Generated Image Builder Configuration** for creating custom ParallelCluster AMIs
+- **Automatic ParentImage Discovery** using the latest ParallelCluster RHEL9 AMI
+- **Configurable Build Settings** for instance type, packages, and custom scripts
 
 ## Prerequisites
 
@@ -75,10 +80,44 @@ The following outputs are specifically needed for your ParallelCluster configura
 - `compute_subnet_id` - Use this for the compute queues SubnetIds
 - `efs_file_system_id` - Use this for the SharedStorage EfsSettings FileSystemId
 - `pcluster_security_group_id` - Additional security group for the cluster nodes
+- `pcluster_parent_image_id` - AMI ID of the ParallelCluster RHEL9 parent image for Image Builder
 
-## Updating Your ParallelCluster Configuration
+## Generated Configurations
 
-After running this Terraform configuration, update your `cluster-config.yaml` with the new resource IDs:
+After running Terraform, two configuration files are automatically generated in the project root:
+
+1. **`cluster-config-generated.yaml`** - Ready-to-use ParallelCluster configuration
+2. **`imagebuilder-config-generated.yaml`** - Custom AMI build configuration
+
+## Using the Generated Configurations
+
+### ParallelCluster Deployment
+Use the generated cluster configuration directly:
+```bash
+pcluster create-cluster --cluster-name my-cluster --cluster-configuration cluster-config-generated.yaml
+```
+
+### Building a Custom AMI (Optional)
+If you need a custom AMI with additional software:
+
+1. **Build the custom image**:
+```bash
+pcluster build-image --image-configuration imagebuilder-config-generated.yaml --image-id my-custom-image
+```
+
+2. **Wait for the build to complete** (usually 30-60 minutes):
+```bash
+pcluster describe-image --image-id my-custom-image
+```
+
+3. **Update your cluster config** to use the custom AMI:
+```yaml
+Image:
+  # CustomAmi: ami-xxxxxxxxx  # Replace with your custom AMI ID
+```
+
+### Manual Configuration Updates
+If you prefer to manually update your `cluster-config.yaml` with the new resource IDs:
 
 ```yaml
 HeadNode:
@@ -110,10 +149,41 @@ SharedStorage:
 ## Customization Options
 
 ### Network Configuration
-- **Multi-AZ Setup**: Head node and compute subnets are placed in different availability zones (us-east-2a and us-east-2b) to support EFS mount targets (AWS requires one mount target per AZ)
+- **Single-AZ Setup**: Head node and compute subnets are placed in the same availability zone (us-east-2a) for optimal performance
 - Modify CIDR blocks to fit your network architecture
 - Add additional subnets for multi-AZ deployment
 - Adjust security group rules based on your security requirements
+
+### Image Builder Configuration
+- **Instance Type**: Default `c5.xlarge`, configurable via `imagebuilder_instance_type`
+- **Root Volume Size**: Default 35GB, configurable via `imagebuilder_root_volume_size`
+- **S3 Script Storage**: Custom build script automatically uploaded to S3
+- **Script Customization**: Edit `terraform/custom-image-script.sh` and re-run `terraform apply`
+
+The Image Builder configuration uses an S3-stored script for maximum flexibility:
+
+1. **Default Script**: Installs development tools, Python packages, HPC utilities
+2. **Custom Modifications**: Edit `custom-image-script.sh` in the terraform directory
+3. **Automatic Upload**: Script is uploaded to S3 bucket during terraform apply
+4. **Version Control**: S3 bucket has versioning enabled for script history
+
+Example workflow for custom scripts:
+```bash
+# Edit the custom script
+vim terraform/custom-image-script.sh
+
+# Apply changes (uploads new script to S3)
+terraform apply
+
+# Or use the helper script
+./scripts/build-custom-image.sh update-script /path/to/my-script.sh
+```
+
+Example terraform.tfvars customization:
+```hcl
+imagebuilder_instance_type = "c5.2xlarge"
+imagebuilder_root_volume_size = 50
+```
 
 ### EFS Configuration
 - **Performance Mode**: Choose between `generalPurpose` (default) or `maxIO` for higher IOPS
@@ -137,6 +207,9 @@ SharedStorage:
 2. **Use Private Subnets**: Compute nodes are placed in private subnets by default
 3. **Enable EFS Encryption**: Enabled by default in this configuration
 4. **Regular Updates**: Keep Terraform and AWS provider versions updated
+5. **Custom AMI Security**: Review and validate any custom scripts before building images
+6. **S3 Script Security**: S3 bucket has public access blocked and encryption enabled
+7. **Script Validation**: Always test custom scripts in a dev environment first
 
 ## Cleanup
 
@@ -151,10 +224,12 @@ terraform destroy
 
 ### Common Issues
 
-1. **Insufficient Permissions**: Ensure your AWS credentials have permissions to create VPC, EC2, and EFS resources
+1. **Insufficient Permissions**: Ensure your AWS credentials have permissions to create VPC, EC2, EFS, and IAM resources
 2. **Region Availability**: Some instance types may not be available in all regions
 3. **CIDR Conflicts**: Ensure your chosen CIDR blocks don't conflict with existing networks
-4. **EFS Mount Targets**: AWS allows only one EFS mount target per availability zone - this configuration uses two AZs to support both subnets
+4. **EFS Mount Targets**: AWS allows only one EFS mount target per availability zone
+5. **Image Builder Failures**: Check build logs in CloudWatch, ensure subnet has internet access
+6. **AMI Permissions**: Custom AMIs are private by default, share appropriately if needed
 
 ### Useful Commands
 
@@ -167,6 +242,21 @@ terraform import aws_vpc.pcluster_vpc vpc-xxxxxxxxx
 
 # Refresh state
 terraform refresh
+
+# Check Image Builder status
+pcluster list-images
+pcluster describe-image --image-id <image-id>
+
+# Monitor build progress
+aws logs describe-log-groups --log-group-name-prefix /aws/imagebuilder
+
+# S3 script management
+aws s3 ls s3://$(terraform output -raw imagebuilder_s3_bucket)/
+aws s3 cp custom-image-script.sh s3://$(terraform output -raw imagebuilder_s3_bucket)/
+
+# Use helper script for common operations
+./scripts/build-custom-image.sh build --image-id my-image --wait
+./scripts/build-custom-image.sh update-script my-custom-script.sh
 ```
 
 ## Support

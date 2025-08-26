@@ -37,11 +37,18 @@ variable "compute_subnet_cidr" {
   default     = "10.0.2.0/24"
 }
 
+
+
 # Security Configuration
 variable "ssh_allowed_cidr_blocks" {
   description = "CIDR blocks allowed to SSH into the head node"
   type        = list(string)
   default     = ["0.0.0.0/0"] # Restrict this in production
+}
+
+variable "ssh_key_name" {
+  description = "Name of the AWS key pair for SSH access"
+  type        = string
 }
 
 # EFS Configuration
@@ -77,16 +84,19 @@ variable "efs_provisioned_throughput" {
   default     = 100
 }
 
-variable "efs_uid" {
-  description = "UID for EFS access point"
-  type        = number
-  default     = 1001
+
+
+# Image Builder Configuration
+variable "imagebuilder_instance_type" {
+  description = "Instance type for Image Builder builds"
+  type        = string
+  default     = "c5.xlarge"
 }
 
-variable "efs_gid" {
-  description = "GID for EFS access point"
+variable "imagebuilder_root_volume_size" {
+  description = "Root volume size in GB for the custom image"
   type        = number
-  default     = 1001
+  default     = 45
 }
 
 # Tags

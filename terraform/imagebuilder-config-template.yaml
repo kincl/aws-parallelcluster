@@ -1,0 +1,16 @@
+Region: ${region}
+Image:
+  Name: ${cluster_name}-custom-image
+  RootVolume:
+    Size: ${root_volume_size}
+
+Build:
+  ParentImage: ${parent_image_id}
+  InstanceType: ${instance_type}
+  Components:
+    - Type: script
+      Value: ${script_s3_url}
+
+  SubnetId: ${head_node_subnet_id}
+  SecurityGroupIds:
+    - ${security_group_id}

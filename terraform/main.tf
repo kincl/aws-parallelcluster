@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
+    }
   }
 }
 
@@ -19,6 +23,27 @@ provider "aws" {
 # Data sources
 data "aws_availability_zones" "available" {
   state = "available"
+}
+
+# Get the latest ParallelCluster RHEL9 AMI
+data "aws_ami" "pcluster_rhel9" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["aws-parallelcluster-3*-rhel9*"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
 }
 
 # VPC
@@ -59,11 +84,11 @@ resource "aws_subnet" "head_node_subnet" {
   }
 }
 
-# Private Subnet for Compute Nodes
+# Private Subnet for Compute Nodes (same AZ as head node)
 resource "aws_subnet" "compute_subnet" {
   vpc_id            = aws_vpc.pcluster_vpc.id
   cidr_block        = var.compute_subnet_cidr
-  availability_zone = data.aws_availability_zones.available.names[1]
+  availability_zone = data.aws_availability_zones.available.names[0]
 
   tags = {
     Name        = "${var.cluster_name}-compute-subnet"
@@ -98,6 +123,9 @@ resource "aws_nat_gateway" "pcluster_nat" {
   depends_on = [aws_internet_gateway.pcluster_igw]
 }
 
+
+
+
 # Route Tables
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.pcluster_vpc.id
@@ -129,6 +157,8 @@ resource "aws_route_table" "private_rt" {
   }
 }
 
+
+
 # Route Table Associations
 resource "aws_route_table_association" "public_rta" {
   subnet_id      = aws_subnet.head_node_subnet.id
@@ -139,6 +169,8 @@ resource "aws_route_table_association" "private_rta" {
   subnet_id      = aws_subnet.compute_subnet.id
   route_table_id = aws_route_table.private_rt.id
 }
+
+
 
 # Security Group for EFS
 resource "aws_security_group" "efs_sg" {
@@ -240,40 +272,111 @@ resource "aws_efs_file_system" "shared_storage" {
   }
 }
 
-# EFS Mount Targets
-resource "aws_efs_mount_target" "head_node_mt" {
-  file_system_id  = aws_efs_file_system.shared_storage.id
-  subnet_id       = aws_subnet.head_node_subnet.id
-  security_groups = [aws_security_group.efs_sg.id]
-}
-
-resource "aws_efs_mount_target" "compute_mt" {
+# EFS Mount Target (only one needed since both subnets are in same AZ)
+resource "aws_efs_mount_target" "shared_mt" {
   file_system_id  = aws_efs_file_system.shared_storage.id
   subnet_id       = aws_subnet.compute_subnet.id
   security_groups = [aws_security_group.efs_sg.id]
 }
 
-# EFS Access Point for shared directory
-resource "aws_efs_access_point" "shared_access_point" {
-  file_system_id = aws_efs_file_system.shared_storage.id
-
-  posix_user {
-    gid = var.efs_gid
-    uid = var.efs_uid
-  }
-
-  root_directory {
-    path = "/shared"
-    creation_info {
-      owner_gid   = var.efs_gid
-      owner_uid   = var.efs_uid
-      permissions = "755"
-    }
-  }
+# S3 Bucket for Image Builder scripts
+resource "aws_s3_bucket" "imagebuilder_scripts" {
+  bucket = "${var.cluster_name}-imagebuilder-scripts-${random_string.bucket_suffix.result}"
 
   tags = {
-    Name        = "${var.cluster_name}-shared-access-point"
+    Name        = "${var.cluster_name}-imagebuilder-scripts"
     Environment = var.environment
-    Purpose     = "ParallelCluster-SharedStorage"
+    Purpose     = "ParallelCluster-ImageBuilder"
   }
+}
+
+resource "random_string" "bucket_suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+resource "aws_s3_bucket_versioning" "imagebuilder_scripts" {
+  bucket = aws_s3_bucket.imagebuilder_scripts.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "imagebuilder_scripts" {
+  bucket = aws_s3_bucket.imagebuilder_scripts.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "imagebuilder_scripts" {
+  bucket = aws_s3_bucket.imagebuilder_scripts.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Upload the custom script to S3
+resource "aws_s3_object" "custom_script" {
+  bucket = aws_s3_bucket.imagebuilder_scripts.id
+  key    = "custom-image-script.sh"
+  source = "${path.module}/custom-image-script.sh"
+  etag   = filemd5("${path.module}/custom-image-script.sh")
+
+  tags = {
+    Name        = "custom-image-script"
+    Environment = var.environment
+    Purpose     = "ParallelCluster-ImageBuilder"
+  }
+}
+
+# Template file for cluster configuration
+resource "local_file" "cluster_config" {
+  content = templatefile("${path.module}/cluster-config-template.yaml", {
+    region              = var.aws_region
+    head_node_subnet_id = aws_subnet.head_node_subnet.id
+    compute_subnet_id   = aws_subnet.compute_subnet.id
+    security_group_id   = aws_security_group.pcluster_sg.id
+    efs_file_system_id  = aws_efs_file_system.shared_storage.id
+    ssh_key_name        = var.ssh_key_name
+  })
+
+  filename = "${path.module}/../cluster-config-generated.yaml"
+
+  depends_on = [
+    aws_subnet.head_node_subnet,
+    aws_subnet.compute_subnet,
+    aws_security_group.pcluster_sg,
+    aws_efs_file_system.shared_storage
+  ]
+}
+
+# Template file for Image Builder configuration
+resource "local_file" "imagebuilder_config" {
+  content = templatefile("${path.module}/imagebuilder-config-template.yaml", {
+    region               = var.aws_region
+    cluster_name         = var.cluster_name
+    parent_image_id      = data.aws_ami.pcluster_rhel9.id
+    head_node_subnet_id  = aws_subnet.head_node_subnet.id
+    security_group_id    = aws_security_group.pcluster_sg.id
+    environment          = var.environment
+    instance_type        = var.imagebuilder_instance_type
+    root_volume_size     = var.imagebuilder_root_volume_size
+    script_s3_url        = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
+  })
+
+  filename = "${path.module}/../imagebuilder-config-generated.yaml"
+
+  depends_on = [
+    aws_subnet.head_node_subnet,
+    aws_security_group.pcluster_sg,
+    data.aws_ami.pcluster_rhel9,
+    aws_s3_object.custom_script
+  ]
 }

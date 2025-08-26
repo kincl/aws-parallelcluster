@@ -17,15 +17,19 @@ compute_subnet_cidr     = "10.0.2.0/24"
 # Restrict this to your IP range in production for better security
 ssh_allowed_cidr_blocks = ["0.0.0.0/0"]
 
+# SSH Key Configuration
+# Update this to match your AWS key pair name
+ssh_key_name = "jkincl"
+
 # EFS Configuration
 efs_encrypted         = true
 efs_performance_mode  = "generalPurpose"  # or "maxIO" for higher performance
 efs_throughput_mode   = "bursting"        # or "provisioned" for guaranteed throughput
 efs_provisioned_throughput = 100          # Only used if throughput_mode is "provisioned"
 
-# EFS Access Point Configuration
-efs_uid = 1001
-efs_gid = 1001
+# Image Builder Configuration
+imagebuilder_instance_type     = "c5.xlarge"   # Instance type for building custom images
+imagebuilder_root_volume_size  = 35            # Root volume size in GB for custom images
 
 # Additional Tags (optional)
 additional_tags = {

@@ -64,11 +64,6 @@ output "efs_dns_name" {
   value       = aws_efs_file_system.shared_storage.dns_name
 }
 
-output "efs_access_point_id" {
-  description = "ID of the EFS access point for shared directory"
-  value       = aws_efs_access_point.shared_access_point.id
-}
-
 # NAT Gateway
 output "nat_gateway_id" {
   description = "ID of the NAT Gateway"
@@ -80,10 +75,39 @@ output "nat_gateway_public_ip" {
   value       = aws_eip.nat_eip.public_ip
 }
 
+
+
 # Internet Gateway
 output "internet_gateway_id" {
   description = "ID of the Internet Gateway"
   value       = aws_internet_gateway.pcluster_igw.id
+}
+
+# SSH Key Name
+output "ssh_key_name" {
+  description = "SSH key name for cluster access"
+  value       = var.ssh_key_name
+}
+
+# Image Builder Information
+output "pcluster_parent_image_id" {
+  description = "AMI ID of the ParallelCluster RHEL9 parent image"
+  value       = data.aws_ami.pcluster_rhel9.id
+}
+
+output "pcluster_parent_image_name" {
+  description = "Name of the ParallelCluster RHEL9 parent image"
+  value       = data.aws_ami.pcluster_rhel9.name
+}
+
+output "imagebuilder_s3_bucket" {
+  description = "S3 bucket name for Image Builder scripts"
+  value       = aws_s3_bucket.imagebuilder_scripts.bucket
+}
+
+output "imagebuilder_script_s3_url" {
+  description = "S3 URL for the custom Image Builder script"
+  value       = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
 }
 
 # For ParallelCluster Configuration
@@ -96,5 +120,9 @@ output "pcluster_config_values" {
     efs_file_system_id  = aws_efs_file_system.shared_storage.id
     security_group_id   = aws_security_group.pcluster_sg.id
     vpc_id              = aws_vpc.pcluster_vpc.id
+    ssh_key_name        = var.ssh_key_name
+    parent_image_id     = data.aws_ami.pcluster_rhel9.id
+    s3_bucket           = aws_s3_bucket.imagebuilder_scripts.bucket
+    script_s3_url       = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
   }
 }
