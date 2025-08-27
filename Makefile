@@ -67,40 +67,40 @@ validate-config: ## Validate the generated cluster configuration
 	$(VENV_ACTIVATE) && pcluster create-cluster --cluster-name test --cluster-configuration cluster-config-generated.yaml --dryrun true
 	@echo "Cluster configuration is valid!"
 
-create-cluster: ## Create ParallelCluster (requires CLUSTER_NAME variable)
-	@if [ -z "$(CLUSTER_NAME)" ]; then \
-		echo "ERROR: CLUSTER_NAME not specified. Usage: make create-cluster CLUSTER_NAME=my-cluster"; \
+create-cluster: ## Create ParallelCluster (requires NAME variable)
+	@if [ -z "$(NAME)" ]; then \
+		echo "ERROR: NAME not specified. Usage: make create-cluster NAME=my-cluster"; \
 		exit 1; \
 	fi
 	@if [ ! -f "cluster-config-generated.yaml" ]; then \
 		echo "ERROR: cluster-config-generated.yaml not found. Run 'make generate-config' first."; \
 		exit 1; \
 	fi
-	@echo "Creating ParallelCluster: $(CLUSTER_NAME)"
+	@echo "Creating ParallelCluster: $(NAME)"
 	$(VENV_ACTIVATE) && pcluster create-cluster \
-		--cluster-name $(CLUSTER_NAME) \
+		--cluster-name $(NAME) \
 		--cluster-configuration cluster-config-generated.yaml
-	@echo "Cluster creation started! Monitor progress with: pcluster describe-cluster --cluster-name $(CLUSTER_NAME)"
+	@echo "Cluster creation started! Monitor progress with: pcluster describe-cluster --cluster-name $(NAME)"
 
-delete-cluster: ## Delete ParallelCluster (requires CLUSTER_NAME variable)
-	@if [ -z "$(CLUSTER_NAME)" ]; then \
-		echo "ERROR: CLUSTER_NAME not specified. Usage: make delete-cluster CLUSTER_NAME=my-cluster"; \
+delete-cluster: ## Delete ParallelCluster (requires NAME variable)
+	@if [ -z "$(NAME)" ]; then \
+		echo "ERROR: NAME not specified. Usage: make delete-cluster NAME=my-cluster"; \
 		exit 1; \
 	fi
-	@echo "WARNING: This will delete the cluster: $(CLUSTER_NAME)"
+	@echo "WARNING: This will delete the cluster: $(NAME)"
 	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ]
-	$(VENV_ACTIVATE) && pcluster delete-cluster --cluster-name $(CLUSTER_NAME)
+	$(VENV_ACTIVATE) && pcluster delete-cluster --cluster-name $(NAME)
 	@echo "Cluster deletion started!"
 
-ssh-cluster: ## SSH to ParallelCluster head node (requires CLUSTER_NAME variable)
-	@if [ -z "$(CLUSTER_NAME)" ]; then \
-		echo "ERROR: CLUSTER_NAME not specified. Usage: make ssh-cluster CLUSTER_NAME=my-cluster"; \
+ssh: ## SSH to ParallelCluster head node (requires NAME variable)
+	@if [ -z "$(NAME)" ]; then \
+		echo "ERROR: NAME not specified. Usage: make ssh-cluster NAME=my-cluster"; \
 		exit 1; \
 	fi
-	@echo "Getting head node information for cluster: $(CLUSTER_NAME)"
-	@HEAD_NODE_IP=$$($(VENV_ACTIVATE) && pcluster describe-cluster --cluster-name $(CLUSTER_NAME) --query 'headNode.publicIpAddress' | tr -d \" 2>/dev/null); \
+	@echo "Getting head node information for cluster: $(NAME)"
+	@HEAD_NODE_IP=$$($(VENV_ACTIVATE) && pcluster describe-cluster --cluster-name $(NAME) --query 'headNode.publicIpAddress' | tr -d \" 2>/dev/null); \
 	if [ "$$HEAD_NODE_IP" = "None" ] || [ -z "$$HEAD_NODE_IP" ]; then \
-		echo "ERROR: Could not get head node IP for cluster $(CLUSTER_NAME)"; \
+		echo "ERROR: Could not get head node IP for cluster $(NAME)"; \
 		echo "Make sure the cluster exists and is running."; \
 		exit 1; \
 	fi; \
@@ -179,24 +179,24 @@ deploy: init plan apply generate-config validate-config ## Complete deployment w
 	@echo ""
 	@echo "Next steps:"
 	@echo "1. Review the generated configuration: cluster-config-generated.yaml"
-	@echo "2. Create your cluster: make create-cluster CLUSTER_NAME=my-cluster"
+	@echo "2. Create your cluster: make create-cluster NAME=my-cluster"
 	@echo "3. Monitor cluster status: pcluster describe-cluster --cluster-name my-cluster"
 
-# Development targets
-fmt: ## Format Terraform code
-	cd terraform && terraform fmt -recursive
+# # Development targets
+# fmt: ## Format Terraform code
+# 	cd terraform && terraform fmt -recursive
 
 validate: validate-terraform validate-config ## Validate both Terraform and cluster configurations
 
 # Quick cluster creation for development
 dev-cluster: ## Create development cluster with default name
-	$(MAKE) create-cluster CLUSTER_NAME=dev-pcluster
+	$(MAKE) create-cluster NAME=dev-pcluster
 
-ssh-dev: ## SSH to development cluster
-	$(MAKE) ssh-cluster CLUSTER_NAME=dev-pcluster
+dev-ssh: ## SSH to development cluster
+	$(MAKE) ssh-cluster NAME=dev-pcluster
 
-delete-dev-cluster: ## Delete development cluster with default name
-	$(MAKE) delete-cluster CLUSTER_NAME=dev-pcluster
+dev-delete: ## Delete development cluster with default name
+	$(MAKE) delete-cluster NAME=dev-pcluster
 
 # Examples in help
 examples: ## Show example commands
@@ -207,18 +207,18 @@ examples: ## Show example commands
 	@echo "  make setup"
 	@echo "  # Edit terraform/terraform.tfvars"
 	@echo "  make deploy"
-	@echo "  make create-cluster CLUSTER_NAME=research-cluster"
+	@echo "  make create-cluster NAME=research-cluster"
 	@echo ""
 	@echo "Check status:"
 	@echo "  make status"
 	@echo "  pcluster describe-cluster --cluster-name research-cluster"
 	@echo ""
 	@echo "Connect to cluster:"
-	@echo "  make ssh-cluster CLUSTER_NAME=research-cluster"
-	@echo "  make ssh-cluster CLUSTER_NAME=research-cluster SSH_KEY_PATH=~/.ssh/my-key.pem"
+	@echo "  make ssh-cluster NAME=research-cluster"
+	@echo "  make ssh-cluster NAME=research-cluster SSH_KEY_PATH=~/.ssh/my-key.pem"
 	@echo ""
 	@echo "Cleanup:"
-	@echo "  make delete-cluster CLUSTER_NAME=research-cluster"
+	@echo "  make delete-cluster NAME=research-cluster"
 	@echo "  make destroy"
 
 # Virtual environment management
