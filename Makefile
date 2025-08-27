@@ -1,6 +1,9 @@
 # AWS ParallelCluster Infrastructure and Configuration Management
 # This Makefile provides convenient targets for common operations
 
+# Virtual environment activation command
+VENV_ACTIVATE = source env/bin/activate && export PYTHONWARNINGS=ignore
+
 .PHONY: help init plan apply destroy validate-terraform generate-config validate-config create-cluster delete-cluster clean status
 
 # Default target
@@ -13,7 +16,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "Configuration files:"
 	@echo "  terraform/terraform.tfvars    - Terraform variables (copy from .example)"
-	@echo "  pcluster/cluster-config-generated.yaml - Generated cluster config"
+	@echo "  cluster-config-generated.yaml - Generated cluster config"
 	@echo ""
 	@echo "Example workflow:"
 	@echo "  make init plan apply generate-config validate-config create-cluster"
@@ -31,7 +34,7 @@ apply: ## Deploy infrastructure with Terraform
 	@echo "Deploying infrastructure..."
 	cd terraform && terraform apply
 	@echo "Infrastructure deployed successfully!"
-	@echo "Cluster configuration generated at: pcluster/cluster-config-generated.yaml"
+	@echo "Cluster configuration generated at: cluster-config-generated.yaml"
 
 destroy: ## Destroy infrastructure
 	@echo "WARNING: This will destroy all infrastructure!"
@@ -57,11 +60,11 @@ generate-config-full: ## Generate cluster configuration using full-featured scri
 # ParallelCluster operations
 validate-config: ## Validate the generated cluster configuration
 	@echo "Validating cluster configuration..."
-	@if [ ! -f "pcluster/cluster-config-generated.yaml" ]; then \
+	@if [ ! -f "cluster-config-generated.yaml" ]; then \
 		echo "ERROR: cluster-config-generated.yaml not found. Run 'make generate-config' first."; \
 		exit 1; \
 	fi
-	pcluster validate-cluster-configuration --cluster-configuration pcluster/cluster-config-generated.yaml
+	$(VENV_ACTIVATE) && pcluster create-cluster --cluster-name test --cluster-configuration cluster-config-generated.yaml --dryrun true
 	@echo "Cluster configuration is valid!"
 
 create-cluster: ## Create ParallelCluster (requires CLUSTER_NAME variable)
@@ -69,14 +72,14 @@ create-cluster: ## Create ParallelCluster (requires CLUSTER_NAME variable)
 		echo "ERROR: CLUSTER_NAME not specified. Usage: make create-cluster CLUSTER_NAME=my-cluster"; \
 		exit 1; \
 	fi
-	@if [ ! -f "pcluster/cluster-config-generated.yaml" ]; then \
+	@if [ ! -f "cluster-config-generated.yaml" ]; then \
 		echo "ERROR: cluster-config-generated.yaml not found. Run 'make generate-config' first."; \
 		exit 1; \
 	fi
 	@echo "Creating ParallelCluster: $(CLUSTER_NAME)"
-	pcluster create-cluster \
+	$(VENV_ACTIVATE) && pcluster create-cluster \
 		--cluster-name $(CLUSTER_NAME) \
-		--cluster-configuration pcluster/cluster-config-generated.yaml
+		--cluster-configuration cluster-config-generated.yaml
 	@echo "Cluster creation started! Monitor progress with: pcluster describe-cluster --cluster-name $(CLUSTER_NAME)"
 
 delete-cluster: ## Delete ParallelCluster (requires CLUSTER_NAME variable)
@@ -86,7 +89,7 @@ delete-cluster: ## Delete ParallelCluster (requires CLUSTER_NAME variable)
 	fi
 	@echo "WARNING: This will delete the cluster: $(CLUSTER_NAME)"
 	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ]
-	pcluster delete-cluster --cluster-name $(CLUSTER_NAME)
+	$(VENV_ACTIVATE) && pcluster delete-cluster --cluster-name $(CLUSTER_NAME)
 	@echo "Cluster deletion started!"
 
 # Status and information
@@ -100,14 +103,14 @@ status: ## Show status of infrastructure and clusters
 	fi
 	@echo ""
 	@echo "=== Configuration Status ==="
-	@if [ -f "pcluster/cluster-config-generated.yaml" ]; then \
+	@if [ -f "cluster-config-generated.yaml" ]; then \
 		echo "✅ Cluster configuration generated"; \
 	else \
 		echo "❌ Cluster configuration not generated - run 'make generate-config'"; \
 	fi
 	@echo ""
 	@echo "=== ParallelCluster Status ==="
-	@pcluster list-clusters --query 'clusters[].{Name:clusterName,Status:clusterStatus}' --output table 2>/dev/null || echo "No clusters found or pcluster CLI not configured"
+	@$(VENV_ACTIVATE) && pcluster list-clusters --query 'clusters[].{Name:clusterName,Status:clusterStatus}' --output table 2>/dev/null || echo "No clusters found or pcluster CLI not configured"
 
 outputs: ## Show Terraform outputs
 	@echo "Terraform Outputs:"
@@ -117,7 +120,7 @@ outputs: ## Show Terraform outputs
 # Utility targets
 clean: ## Clean generated files
 	@echo "Cleaning generated files..."
-	rm -f pcluster/cluster-config-generated.yaml
+	rm -f cluster-config-generated.yaml
 	rm -f terraform/.terraform.lock.hcl
 	rm -rf terraform/.terraform/
 	@echo "Cleaned successfully!"
@@ -137,8 +140,19 @@ check-prereqs: ## Check if required tools are installed
 	@echo "Checking prerequisites..."
 	@which terraform >/dev/null 2>&1 && echo "✅ terraform" || echo "❌ terraform - install from https://terraform.io"
 	@which aws >/dev/null 2>&1 && echo "✅ aws CLI" || echo "❌ aws CLI - install from https://aws.amazon.com/cli/"
-	@which pcluster >/dev/null 2>&1 && echo "✅ pcluster CLI" || echo "❌ pcluster CLI - install with: pip install aws-parallelcluster"
+	@if [ -f "env/bin/activate" ]; then \
+		$(VENV_ACTIVATE) && which pcluster >/dev/null 2>&1 && echo "✅ pcluster CLI (in venv)" || echo "❌ pcluster CLI - install with: pip install aws-parallelcluster"; \
+	else \
+		which pcluster >/dev/null 2>&1 && echo "✅ pcluster CLI (global)" || echo "❌ pcluster CLI - install with: pip install aws-parallelcluster"; \
+	fi
 	@which jq >/dev/null 2>&1 && echo "✅ jq (optional)" || echo "⚠️  jq (optional) - install for full-featured script support"
+	@echo ""
+	@echo "Virtual Environment:"
+	@if [ -f "env/bin/activate" ]; then \
+		echo "✅ Virtual environment found at env/"; \
+	else \
+		echo "⚠️  Virtual environment not found - create with: python -m venv env && source env/bin/activate && pip install aws-parallelcluster"; \
+	fi
 	@echo ""
 	@echo "AWS Configuration:"
 	@aws sts get-caller-identity >/dev/null 2>&1 && echo "✅ AWS credentials configured" || echo "❌ AWS credentials not configured - run 'aws configure'"
@@ -149,7 +163,7 @@ deploy: init plan apply generate-config validate-config ## Complete deployment w
 	@echo "🎉 Deployment completed successfully!"
 	@echo ""
 	@echo "Next steps:"
-	@echo "1. Review the generated configuration: pcluster/cluster-config-generated.yaml"
+	@echo "1. Review the generated configuration: cluster-config-generated.yaml"
 	@echo "2. Create your cluster: make create-cluster CLUSTER_NAME=my-cluster"
 	@echo "3. Monitor cluster status: pcluster describe-cluster --cluster-name my-cluster"
 
@@ -181,3 +195,16 @@ examples: ## Show example commands
 	@echo "Cleanup:"
 	@echo "  make delete-cluster CLUSTER_NAME=research-cluster"
 	@echo "  make destroy"
+
+# Virtual environment management
+venv-create: ## Create virtual environment and install pcluster
+	@echo "Creating virtual environment..."
+	python -m venv env
+	$(VENV_ACTIVATE) && pip install --upgrade pip
+	$(VENV_ACTIVATE) && pip install aws-parallelcluster
+	@echo "✅ Virtual environment created and pcluster installed!"
+
+venv-update: ## Update pcluster in virtual environment
+	@echo "Updating pcluster in virtual environment..."
+	$(VENV_ACTIVATE) && pip install --upgrade aws-parallelcluster
+	@echo "✅ pcluster updated!"
