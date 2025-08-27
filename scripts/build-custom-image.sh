@@ -2,6 +2,8 @@
 
 # AWS ParallelCluster Custom Image Builder Helper Script
 # This script helps build and manage custom ParallelCluster AMIs using Image Builder
+export PYTHONWARNINGS="ignore"
+source env/bin/activate
 
 set -e  # Exit on any error
 

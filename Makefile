@@ -4,7 +4,7 @@
 # Virtual environment activation command
 VENV_ACTIVATE = source env/bin/activate && export PYTHONWARNINGS=ignore
 
-.PHONY: help init plan apply destroy validate-terraform generate-config validate-config create-cluster delete-cluster clean status
+.PHONY: help init plan apply destroy validate-terraform generate-config validate-config create-cluster delete-cluster ssh-cluster clean status
 
 # Default target
 help: ## Show this help message
@@ -92,6 +92,21 @@ delete-cluster: ## Delete ParallelCluster (requires CLUSTER_NAME variable)
 	$(VENV_ACTIVATE) && pcluster delete-cluster --cluster-name $(CLUSTER_NAME)
 	@echo "Cluster deletion started!"
 
+ssh-cluster: ## SSH to ParallelCluster head node (requires CLUSTER_NAME variable)
+	@if [ -z "$(CLUSTER_NAME)" ]; then \
+		echo "ERROR: CLUSTER_NAME not specified. Usage: make ssh-cluster CLUSTER_NAME=my-cluster"; \
+		exit 1; \
+	fi
+	@echo "Getting head node information for cluster: $(CLUSTER_NAME)"
+	@HEAD_NODE_IP=$$($(VENV_ACTIVATE) && pcluster describe-cluster --cluster-name $(CLUSTER_NAME) --query 'headNode.publicIpAddress' | tr -d \" 2>/dev/null); \
+	if [ "$$HEAD_NODE_IP" = "None" ] || [ -z "$$HEAD_NODE_IP" ]; then \
+		echo "ERROR: Could not get head node IP for cluster $(CLUSTER_NAME)"; \
+		echo "Make sure the cluster exists and is running."; \
+		exit 1; \
+	fi; \
+	echo "Connecting to head node at $$HEAD_NODE_IP"; \
+	ssh ec2-user@$$HEAD_NODE_IP
+
 # Status and information
 status: ## Show status of infrastructure and clusters
 	@echo "=== Terraform Status ==="
@@ -110,20 +125,20 @@ status: ## Show status of infrastructure and clusters
 	fi
 	@echo ""
 	@echo "=== ParallelCluster Status ==="
-	@$(VENV_ACTIVATE) && pcluster list-clusters --query 'clusters[].{Name:clusterName,Status:clusterStatus}' --output table 2>/dev/null || echo "No clusters found or pcluster CLI not configured"
+	@$(VENV_ACTIVATE) && pcluster list-clusters --query 'clusters[].{Name:clusterName,Status:clusterStatus}' 2>/dev/null || echo "No clusters found or pcluster CLI not configured"
 
 outputs: ## Show Terraform outputs
 	@echo "Terraform Outputs:"
 	@echo "=================="
 	cd terraform && terraform output
 
-# Utility targets
-clean: ## Clean generated files
-	@echo "Cleaning generated files..."
-	rm -f cluster-config-generated.yaml
-	rm -f terraform/.terraform.lock.hcl
-	rm -rf terraform/.terraform/
-	@echo "Cleaned successfully!"
+# # Utility targets
+# clean: ## Clean generated files
+# 	@echo "Cleaning generated files..."
+# 	rm -f cluster-config-generated.yaml
+# 	rm -f terraform/.terraform.lock.hcl
+# 	rm -rf terraform/.terraform/
+# 	@echo "Cleaned successfully!"
 
 setup: ## Setup initial configuration files
 	@echo "Setting up initial configuration..."
@@ -177,6 +192,12 @@ validate: validate-terraform validate-config ## Validate both Terraform and clus
 dev-cluster: ## Create development cluster with default name
 	$(MAKE) create-cluster CLUSTER_NAME=dev-pcluster
 
+ssh-dev: ## SSH to development cluster
+	$(MAKE) ssh-cluster CLUSTER_NAME=dev-pcluster
+
+delete-dev-cluster: ## Delete development cluster with default name
+	$(MAKE) delete-cluster CLUSTER_NAME=dev-pcluster
+
 # Examples in help
 examples: ## Show example commands
 	@echo "Example Commands:"
@@ -191,6 +212,10 @@ examples: ## Show example commands
 	@echo "Check status:"
 	@echo "  make status"
 	@echo "  pcluster describe-cluster --cluster-name research-cluster"
+	@echo ""
+	@echo "Connect to cluster:"
+	@echo "  make ssh-cluster CLUSTER_NAME=research-cluster"
+	@echo "  make ssh-cluster CLUSTER_NAME=research-cluster SSH_KEY_PATH=~/.ssh/my-key.pem"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make delete-cluster CLUSTER_NAME=research-cluster"
