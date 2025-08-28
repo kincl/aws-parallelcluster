@@ -1,73 +1,65 @@
 # AWS ParallelCluster Configuration Generator
 
-This directory contains scripts and templates to automatically generate AWS ParallelCluster configuration files from Terraform infrastructure outputs.
+This directory contains scripts and configuration templates for AWS ParallelCluster infrastructure management.
 
 ## Overview
 
-After deploying the infrastructure using Terraform, you need to generate a `cluster-config.yaml` file that references the created resources. This directory provides two approaches:
-
-1. **Terraform Template Approach**: Automatically generates the config file as part of `terraform apply`
-2. **Shell Script Approach**: Manually generates the config file from Terraform outputs
+The ParallelCluster configuration is automatically generated using Terraform's `templatefile()` function. When you run `terraform apply`, it processes the `cluster-config-template.yaml` template with actual infrastructure values and creates the cluster configuration file.
 
 ## Prerequisites
 
 - Terraform infrastructure must be deployed first (`terraform apply` completed successfully)
 - AWS CLI configured with appropriate permissions
-- For shell script approach: `jq` command-line tool (for the full-featured script)
 
-## Method 1: Terraform Template (Automatic)
+## Configuration Generation
 
-The Terraform configuration includes a `local_file` resource that automatically generates the cluster configuration file.
+### Terraform Template Approach (Recommended)
 
-### How it works:
+The cluster configuration is automatically generated as part of the Terraform deployment process.
 
-1. The `cluster-config-template.yaml` file contains a template with placeholders
+**How it works:**
+
+1. The `terraform/cluster-config-template.yaml` file contains a template with placeholders
 2. During `terraform apply`, the template is processed with actual resource IDs
-3. The generated file is saved as `../pcluster/cluster-config-generated.yaml`
+3. The generated file is saved as `cluster-config-generated.yaml` in the project root
 
-### Usage:
+**Usage:**
 
+From the project root:
 ```bash
-cd terraform
-terraform apply
+# Generate configuration as part of full deployment
+make apply
+
+# Or generate just the configuration file
+make generate-config
 ```
 
-The cluster configuration will be automatically generated at `pcluster/cluster-config-generated.yaml`.
+This runs `terraform apply -auto-approve -target=local_file.cluster_config` to generate only the cluster configuration file.
 
-## Method 2: Shell Scripts (Manual)
+## Custom AMI Support
 
-Two shell scripts are provided for manual generation:
+You can optionally use a custom AMI by setting the `custom_ami` variable in `terraform/terraform.tfvars`:
 
-### Full-Featured Script (`generate-cluster-config.sh`)
+```hcl
+# Use default ParallelCluster AMI (recommended for most users)
+custom_ami = ""
 
-Requires `jq` for JSON parsing and provides comprehensive error checking.
-
-```bash
-cd scripts
-./generate-cluster-config.sh [OPTIONS]
+# Or specify a custom AMI ID
+custom_ami = "ami-0123456789abcdef0"
 ```
 
-**Options:**
-- `-t, --terraform-dir DIR`: Path to Terraform directory (default: ../terraform)
-- `-o, --output FILE`: Output file path (default: ../pcluster/cluster-config-generated.yaml)
-- `-k, --ssh-key KEY`: SSH key name (default: jkincl)
-- `-h, --help`: Show help message
-
-**Example:**
-```bash
-./generate-cluster-config.sh -k my-ssh-key -o ~/my-cluster-config.yaml
+When `custom_ami` is set to a non-empty value, the generated cluster configuration will include:
+```yaml
+Image:
+  Os: rhel9
+  CustomAmi: ami-0123456789abcdef0
 ```
 
-### Simple Script (`generate-cluster-config-simple.sh`)
-
-Does not require `jq` and uses basic text processing.
-
-```bash
-cd scripts
-./generate-cluster-config-simple.sh [OPTIONS]
+When `custom_ami` is empty or unset, it will only include:
+```yaml
+Image:
+  Os: rhel9
 ```
-
-Same options as the full-featured script.
 
 ## Configuration Details
 
@@ -75,102 +67,122 @@ The generated cluster configuration includes:
 
 ### Infrastructure Components:
 - **Region**: AWS region where infrastructure is deployed
-- **Head Node Subnet**: Public subnet for the head node
+- **Head Node Subnet**: Public subnet for the head node with Elastic IP
 - **Compute Subnet**: Private subnet for compute nodes
-- **Security Groups**: Configured for SLURM and SSH access
+- **Security Groups**: Configured for SLURM communication and SSH access
 - **EFS File System**: Shared storage mounted at `/shared`
 
-### Cluster Configuration:
-- **Image**: CentOS 7 (can be customized)
-- **Head Node**: t2.micro instance with Elastic IP
+### Default Cluster Configuration:
+- **Image**: RHEL 9 (with optional custom AMI support)
+- **Head Node**: m5a.large instance with Elastic IP
 - **Compute Queues**:
-  - `micro`: t2.micro instances (0-10 nodes)
-  - `xlarge`: c5.xlarge instances (0-5 nodes)
+  - `debug`: c7i-flex.large instances (0-5 nodes)
+  - `standard`: c5.xlarge instances (0-5 nodes)
+  - `gpu`: g4dn.4xlarge instances (0-5 nodes)
 - **Shared Storage**: EFS mounted at `/shared`
 
 ## Customization
 
 After generating the configuration file, you can customize:
 
-1. **Instance Types**: Change instance types for head node or compute nodes
-2. **Queue Configuration**: Modify queue names, instance types, or scaling limits
-3. **Operating System**: Change from CentOS 7 to other supported OSes
-4. **Custom AMI**: Uncomment and specify a custom AMI ID
-5. **Additional Queues**: Add more compute queues with different configurations
+1. **Instance Types**: Modify the template or edit the generated file
+2. **Queue Configuration**: Add/remove queues, change scaling limits
+3. **Custom AMI**: Set `custom_ami` variable in `terraform.tfvars`
+4. **Operating System**: Modify the `Os` field in the template
+5. **Additional Storage**: Add more EFS or FSx storage configurations
 
 ## Validation
 
-Before deploying the cluster, validate your configuration:
+Validate your configuration before deploying:
 
 ```bash
-pcluster validate-cluster-configuration --cluster-configuration cluster-config-generated.yaml
+make validate-config
 ```
+
+This runs: `pcluster create-cluster --cluster-name test --cluster-configuration cluster-config-generated.yaml --dryrun true`
 
 ## Deployment
 
 Deploy your cluster using the generated configuration:
 
 ```bash
+make create-cluster CLUSTER_NAME=my-cluster
+```
+
+Or manually:
+```bash
 pcluster create-cluster \
   --cluster-name my-parallelcluster \
   --cluster-configuration cluster-config-generated.yaml
+```
+
+## Other Scripts
+
+### build-custom-image.sh
+
+Script for building custom ParallelCluster images using Image Builder. This creates AMIs with pre-installed software and configurations.
+
+Usage:
+```bash
+cd scripts
+./build-custom-image.sh
 ```
 
 ## Troubleshooting
 
 ### Common Issues:
 
-1. **"Terraform state file not found"**
-   - Ensure you've run `terraform apply` successfully
-   - Check that you're in the correct directory
+1. **"cluster-config-generated.yaml not found"**
+   - Run `make generate-config` to create the configuration file
+   - Ensure Terraform infrastructure is deployed first
 
-2. **"Could not retrieve ... from Terraform outputs"**
-   - Verify Terraform resources were created successfully
-   - Run `terraform output` to check available outputs
+2. **"Terraform state file not found"**
+   - Run `make apply` to deploy the infrastructure first
 
-3. **"SSH key not found"**
-   - Ensure the SSH key exists in your AWS account
-   - Update the key name in the script or configuration
-
-4. **Region mismatch**
-   - Ensure your AWS CLI region matches the Terraform deployment region
+3. **Custom AMI not appearing in config**
+   - Ensure `custom_ami` is set in `terraform/terraform.tfvars`
+   - Run `make generate-config` after updating the variable
 
 ### Debug Commands:
 
 ```bash
 # Check Terraform outputs
-cd terraform
-terraform output
+make outputs
 
-# Check specific output
-terraform output head_node_subnet_id
+# Check infrastructure status
+make status
 
-# Validate cluster configuration
-pcluster validate-cluster-configuration --cluster-configuration cluster-config-generated.yaml
+# Validate configuration
+make validate-config
+
+# Generate fresh configuration
+make generate-config
 ```
 
 ## File Structure
 
 ```
 scripts/
-├── README.md                           # This file
-├── generate-cluster-config.sh          # Full-featured generation script
-├── generate-cluster-config-simple.sh   # Simple generation script
-└── ../terraform/
-    └── cluster-config-template.yaml    # Terraform template file
+├── README.md                    # This file
+├── build-custom-image.sh        # Custom image builder script
+terraform/
+├── cluster-config-template.yaml # Terraform template file
+└── main.tf                     # Includes local_file resource for config generation
 ```
 
 ## Security Notes
 
 - Review and restrict SSH access CIDR blocks in production
-- Consider using custom AMIs with security hardening
+- Consider using custom AMIs with security hardening  
 - Update SSH key names to match your environment
 - Review security group rules for your specific requirements
+- The generated configuration uses RHEL 9 by default
 
 ## Next Steps
 
-1. Generate or review your cluster configuration
-2. Customize instance types and scaling parameters as needed
-3. Validate the configuration using `pcluster validate-cluster-configuration`
-4. Deploy the cluster using `pcluster create-cluster`
-5. Monitor cluster creation and troubleshoot any issues
+1. Set `custom_ami` in `terraform.tfvars` if using a custom image
+2. Run `make deploy` for complete infrastructure and config generation
+3. Customize the generated configuration as needed
+4. Validate with `make validate-config`
+5. Deploy with `make create-cluster CLUSTER_NAME=your-cluster-name`
+6. Connect with `make ssh-cluster CLUSTER_NAME=your-cluster-name`

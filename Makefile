@@ -50,14 +50,9 @@ validate-terraform: ## Validate Terraform configuration
 	@echo "Terraform configuration is valid!"
 
 # Configuration generation
-generate-config: ## Generate cluster configuration from Terraform outputs
+generate-config: ## Generate cluster configuration from Terraform templates
 	@echo "Generating cluster configuration..."
-	cd scripts && ./generate-cluster-config-simple.sh
-	@echo "Cluster configuration generated successfully!"
-
-generate-config-full: ## Generate cluster configuration using full-featured script (requires jq)
-	@echo "Generating cluster configuration with full script..."
-	cd scripts && ./generate-cluster-config.sh
+	cd terraform && terraform apply -auto-approve -target=local_file.cluster_config
 	@echo "Cluster configuration generated successfully!"
 
 # ParallelCluster operations

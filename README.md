@@ -20,16 +20,15 @@ terraform apply
 
 ✅ **Output**: `cluster-config-generated.yaml` is created automatically
 
-### Method 2: Manual Generation with Scripts
+### Manual Regeneration
 
-If you need more control or want to regenerate the configuration:
+If you need to regenerate just the configuration file:
 
 ```bash
-cd scripts
-./generate-cluster-config-simple.sh
+make generate-config
 ```
 
-✅ **Output**: `cluster-config-generated.yaml` is created
+✅ **Output**: `cluster-config-generated.yaml` is updated
 
 ## 🏗️ Infrastructure Components
 
@@ -115,24 +114,13 @@ Image:
 
 ## 🔧 Available Scripts
 
-### `generate-cluster-config.sh` (Full-featured)
-- ✅ Requires `jq` for robust JSON parsing
-- ✅ Comprehensive error checking
-- ✅ All command-line options
+### Terraform Template Generation
+- ✅ Automatic generation during `terraform apply`
+- ✅ Consistent with infrastructure state
+- ✅ Support for custom AMI configuration
 
 ```bash
-./generate-cluster-config.sh \
-  --ssh-key my-key \
-  --output ~/my-cluster-config.yaml
-```
-
-### `generate-cluster-config-simple.sh` (Basic)
-- ✅ No external dependencies
-- ✅ Basic error handling
-- ✅ Same command-line options
-
-```bash
-./generate-cluster-config-simple.sh -k my-key
+make generate-config
 ```
 
 ## 📁 File Structure
@@ -146,8 +134,7 @@ aws-parallelcluster/
 │   ├── terraform.tfvars.example         # Example configuration
 │   └── cluster-config-template.yaml     # Template for generation
 ├── scripts/
-│   ├── generate-cluster-config.sh       # Full-featured script
-│   ├── generate-cluster-config-simple.sh # Basic script
+│   ├── build-custom-image.sh            # Custom image builder script
 │   └── README.md                        # Script documentation
 └── pcluster/
     ├── cluster-config.yaml              # Original example
@@ -209,8 +196,8 @@ terraform output head_node_subnet_id
 # List available keys
 aws ec2 describe-key-pairs --query 'KeyPairs[].KeyName'
 
-# Update configuration
-./generate-cluster-config.sh --ssh-key correct-key-name
+# Update SSH key in terraform.tfvars and regenerate
+make generate-config
 ```
 
 **❌ "Invalid cluster configuration"**
