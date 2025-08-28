@@ -15,8 +15,9 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Configuration files:"
-	@echo "  terraform/terraform.tfvars    - Terraform variables (copy from .example)"
-	@echo "  cluster-config-generated.yaml - Generated cluster config"
+	@echo "  terraform/terraform.tfvars       - Terraform variables (copy from .example)"
+	@echo "  cluster-config-generated.yaml    - Generated cluster config"
+	@echo "  imagebuilder-config-generated.yaml - Generated imagebuilder config"
 	@echo ""
 	@echo "Custom AMI Support:"
 	@echo "  Set 'custom_ami' in terraform.tfvars to use a custom AMI"
@@ -50,10 +51,10 @@ validate-terraform: ## Validate Terraform configuration
 	@echo "Terraform configuration is valid!"
 
 # Configuration generation
-generate-config: ## Generate cluster configuration from Terraform templates
-	@echo "Generating cluster configuration..."
-	cd terraform && terraform apply -auto-approve -target=local_file.cluster_config
-	@echo "Cluster configuration generated successfully!"
+generate-config: ## Generate cluster and imagebuilder configurations from Terraform templates
+	@echo "Generating cluster and imagebuilder configurations..."
+	cd terraform && terraform apply -auto-approve -target=local_file.cluster_config -target=local_file.imagebuilder_config
+	@echo "Cluster and imagebuilder configurations generated successfully!"
 
 # ParallelCluster operations
 validate-config: ## Validate the generated cluster configuration
@@ -176,8 +177,10 @@ deploy: init plan apply generate-config validate-config ## Complete deployment w
 	@echo "🎉 Deployment completed successfully!"
 	@echo ""
 	@echo "Next steps:"
-	@echo "1. Review the generated configuration: cluster-config-generated.yaml"
-	@echo "2. Create your cluster: make create-cluster NAME=my-cluster"
+	@echo "1. Review the generated configurations:"
+	@echo "   - cluster-config-generated.yaml (for cluster creation)"
+	@echo "   - imagebuilder-config-generated.yaml (for custom image building)"
+	@echo "2. Create your cluster: make create-cluster CLUSTER_NAME=my-cluster"
 	@echo "3. Monitor cluster status: pcluster describe-cluster --cluster-name my-cluster"
 
 # # Development targets
