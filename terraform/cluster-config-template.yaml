@@ -18,7 +18,7 @@ Scheduling:
   SlurmQueues:
   - Name: debug
     ComputeResources:
-    - Name: c7i-flexlarge
+    - Name: c7i-flex
       InstanceType: c7i-flex.large
       MinCount: 0
       MaxCount: 5
@@ -29,8 +29,19 @@ Scheduling:
         - ${security_group_id}
   - Name: standard
     ComputeResources:
-    - Name: c5xlarge
+    - Name: c5
       InstanceType: c5.xlarge
+      MinCount: 0
+      MaxCount: 5
+    Networking:
+      SubnetIds:
+      - ${compute_subnet_id}
+      SecurityGroups:
+        - ${security_group_id}
+  - Name: gpu
+    ComputeResources:
+    - Name: g4dn4
+      InstanceType: g4dn.4xlarge
       MinCount: 0
       MaxCount: 5
     Networking:
