@@ -1,7 +1,7 @@
 Region: ${region}
 Image:
-  Os: rhel9
-  # CustomAmi: ami-0b75744612af63596
+  Os: rhel9%{ if custom_ami != "" }
+  CustomAmi: ${custom_ami}%{ endif }
 HeadNode:
   InstanceType: m5a.large
   Networking:

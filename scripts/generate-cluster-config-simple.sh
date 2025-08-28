@@ -74,6 +74,7 @@ HEAD_NODE_SUBNET_ID=$(terraform output -raw head_node_subnet_id | tr -d '\n')
 COMPUTE_SUBNET_ID=$(terraform output -raw compute_subnet_id | tr -d '\n')
 SECURITY_GROUP_ID=$(terraform output -raw pcluster_security_group_id | tr -d '\n')
 EFS_FILE_SYSTEM_ID=$(terraform output -raw efs_file_system_id | tr -d '\n')
+CUSTOM_AMI=$(terraform output -raw custom_ami | tr -d '\n')
 # EFS_ACCESS_POINT_ID removed - no longer using access points
 
 # Validate that we got all required values
@@ -103,6 +104,9 @@ echo "  Head Node Subnet: $HEAD_NODE_SUBNET_ID"
 echo "  Compute Subnet: $COMPUTE_SUBNET_ID"
 echo "  Security Group: $SECURITY_GROUP_ID"
 echo "  EFS File System: $EFS_FILE_SYSTEM_ID"
+if [[ -n "$CUSTOM_AMI" ]]; then
+    echo "  Custom AMI: $CUSTOM_AMI"
+fi
 # EFS Access Point output removed
 
 # Create output directory if it doesn't exist
@@ -112,11 +116,20 @@ mkdir -p "$OUTPUT_DIR"
 # Generate the cluster configuration
 echo "Generating cluster configuration..."
 
-cat > "$OUTPUT_FILE" << EOF
-Region: $REGION
+# Generate Image section with conditional CustomAmi
+if [[ -n "$CUSTOM_AMI" ]]; then
+    IMAGE_CONFIG="Region: $REGION
 Image:
   Os: rhel9
-  # CustomAmi: ami-0b75744612af63596
+  CustomAmi: $CUSTOM_AMI"
+else
+    IMAGE_CONFIG="Region: $REGION
+Image:
+  Os: rhel9"
+fi
+
+cat > "$OUTPUT_FILE" << EOF
+$IMAGE_CONFIG
 HeadNode:
   InstanceType: t3.medium
   Networking:

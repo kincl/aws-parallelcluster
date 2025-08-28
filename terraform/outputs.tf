@@ -110,6 +110,12 @@ output "imagebuilder_script_s3_url" {
   value       = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
 }
 
+# Custom AMI Configuration
+output "custom_ami" {
+  description = "Custom AMI ID for ParallelCluster nodes (if specified)"
+  value       = var.custom_ami
+}
+
 # For ParallelCluster Configuration
 output "pcluster_config_values" {
   description = "Values to use in ParallelCluster configuration"
@@ -124,5 +130,6 @@ output "pcluster_config_values" {
     parent_image_id     = data.aws_ami.pcluster_rhel9.id
     s3_bucket           = aws_s3_bucket.imagebuilder_scripts.bucket
     script_s3_url       = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
+    custom_ami          = var.custom_ami
   }
 }

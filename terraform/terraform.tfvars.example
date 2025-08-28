@@ -31,6 +31,11 @@ efs_provisioned_throughput = 100          # Only used if throughput_mode is "pro
 imagebuilder_instance_type     = "c5.xlarge"   # Instance type for building custom images
 imagebuilder_root_volume_size  = 35            # Root volume size in GB for custom images
 
+# Custom AMI Configuration (optional)
+# Uncomment and specify an AMI ID to use a custom AMI instead of the default ParallelCluster AMI
+# custom_ami = "ami-0123456789abcdef0"
+custom_ami = ""
+
 # Additional Tags (optional)
 additional_tags = {
   Project     = "ParallelCluster"

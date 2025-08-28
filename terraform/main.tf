@@ -345,6 +345,7 @@ resource "local_file" "cluster_config" {
     security_group_id   = aws_security_group.pcluster_sg.id
     efs_file_system_id  = aws_efs_file_system.shared_storage.id
     ssh_key_name        = var.ssh_key_name
+    custom_ami          = var.custom_ami
   })
 
   filename = "${path.module}/../cluster-config-generated.yaml"
@@ -360,15 +361,15 @@ resource "local_file" "cluster_config" {
 # Template file for Image Builder configuration
 resource "local_file" "imagebuilder_config" {
   content = templatefile("${path.module}/imagebuilder-config-template.yaml", {
-    region               = var.aws_region
-    cluster_name         = var.cluster_name
-    parent_image_id      = data.aws_ami.pcluster_rhel9.id
-    head_node_subnet_id  = aws_subnet.head_node_subnet.id
-    security_group_id    = aws_security_group.pcluster_sg.id
-    environment          = var.environment
-    instance_type        = var.imagebuilder_instance_type
-    root_volume_size     = var.imagebuilder_root_volume_size
-    script_s3_url        = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
+    region              = var.aws_region
+    cluster_name        = var.cluster_name
+    parent_image_id     = data.aws_ami.pcluster_rhel9.id
+    head_node_subnet_id = aws_subnet.head_node_subnet.id
+    security_group_id   = aws_security_group.pcluster_sg.id
+    environment         = var.environment
+    instance_type       = var.imagebuilder_instance_type
+    root_volume_size    = var.imagebuilder_root_volume_size
+    script_s3_url       = "s3://${aws_s3_bucket.imagebuilder_scripts.bucket}/${aws_s3_object.custom_script.key}"
   })
 
   filename = "${path.module}/../imagebuilder-config-generated.yaml"

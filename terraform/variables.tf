@@ -99,6 +99,13 @@ variable "imagebuilder_root_volume_size" {
   default     = 45
 }
 
+# Custom AMI Configuration
+variable "custom_ami" {
+  description = "Custom AMI ID to use for ParallelCluster nodes (optional)"
+  type        = string
+  default     = ""
+}
+
 # Tags
 variable "additional_tags" {
   description = "Additional tags to apply to all resources"
