@@ -15,7 +15,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-CONFIG_FILE="../imagebuilder-config-generated.yaml"
+CONFIG_FILE="imagebuilder-config-generated.yaml"
 IMAGE_ID=""
 ACTION=""
 WAIT_FOR_COMPLETION=false
