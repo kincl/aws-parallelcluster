@@ -215,11 +215,11 @@ image-list: ## List all ParallelCluster custom images, ordered by imageId
 	@echo "Listing all custom images..."
 	@echo "IMAGE_ID IMAGEBUILDSTATUS AMI_ID REGION" | column -t
 	@echo "--- AVAILABLE IMAGES ---"
-	$(VENV_ACTIVATE) && pcluster list-images --image-status AVAILABLE --query "sort_by(images, &imageId)" | jq -r '.[] | [.imageId, .imageBuildStatus, .ec2AmiInfo.amiId, .region] | @tsv' | column -t
+	@$(VENV_ACTIVATE) && pcluster list-images --image-status AVAILABLE --query "sort_by(images, &imageId)" | jq -r '.[] | [.imageId, .imageBuildStatus, .ec2AmiInfo.amiId, .region] | @tsv' | column -t
 	@echo "--- PENDING IMAGES ---"
-	$(VENV_ACTIVATE) && pcluster list-images --image-status PENDING --query "sort_by(images, &imageId)" | jq -r '.[] | [.imageId, .imageBuildStatus, .ec2AmiInfo.amiId, .region] | @tsv' | column -t
+	@$(VENV_ACTIVATE) && pcluster list-images --image-status PENDING --query "sort_by(images, &imageId)" | jq -r '.[] | [.imageId, .imageBuildStatus, .ec2AmiInfo.amiId, .region] | @tsv' | column -t
 	@echo "--- FAILED IMAGES ---"
-	$(VENV_ACTIVATE) && pcluster list-images --image-status FAILED --query "sort_by(images, &imageId)" | jq -r '.[] | [.imageId, .imageBuildStatus, .ec2AmiInfo.amiId, .region] | @tsv' | column -t
+	@$(VENV_ACTIVATE) && pcluster list-images --image-status FAILED --query "sort_by(images, &imageId)" | jq -r '.[] | [.imageId, .imageBuildStatus, .ec2AmiInfo.amiId, .region] | @tsv' | column -t
 
 image-build: ## Build a custom ParallelCluster image (optional: ID=custom-name, CONFIG=path, WAIT=true)
 	@echo "Building custom image..."
