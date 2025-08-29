@@ -8,27 +8,17 @@ After deploying AWS infrastructure with Terraform, you need a `cluster-config.ya
 
 ## 🎯 Quick Start
 
-### Method 1: Automatic Generation with Terraform (Recommended)
-
-The simplest approach - the cluster configuration is generated automatically when you apply Terraform:
+The simplest approach is to use the provided makefile commands:
 
 ```bash
-cd terraform
-terraform init
-terraform apply
+# Deploy infrastructure and generate configs
+make apply
+
+# Create a cluster
+make create-cluster NAME=cluster1
 ```
 
-✅ **Output**: `cluster-config-generated.yaml` is created automatically
-
-### Manual Regeneration
-
-If you need to regenerate just the configuration file:
-
-```bash
-make generate-config
-```
-
-✅ **Output**: `cluster-config-generated.yaml` is updated
+That's it! The `make apply` command will run terraform to deploy the infrastructure and generate the configuration files. Then `make create-cluster NAME=cluster1` will create a cluster named "cluster1" using the generated configuration.
 
 ## 🏗️ Infrastructure Components
 
@@ -42,6 +32,47 @@ The generated configuration includes these Terraform-managed resources:
 | **Security Groups** | Network access | SSH, SLURM, NFS rules |
 | **EFS File System** | Shared storage | Encrypted, multi-AZ |
 | **NAT Gateway** | Compute internet | Package installations |
+
+## 🖼️ Custom Image Building
+
+You can build custom AMIs for your clusters using the makefile commands:
+
+```bash
+# List existing custom images
+make image-list
+
+# Build a custom image
+make image-build ID=my-custom-image
+
+# Check image build status
+make image-status ID=my-custom-image
+
+# Delete a custom image
+make image-delete ID=my-custom-image
+```
+
+The image build process uses the auto-generated `imagebuilder-config-generated.yaml` file. You can optionally specify a custom configuration file with the `CONFIG` parameter:
+
+```bash
+make image-build ID=my-custom-image CONFIG=my-custom-imagebuilder-config.yaml
+```
+
+You can also wait for the build to complete by adding the `WAIT=true` parameter:
+
+```bash
+make image-build ID=my-custom-image WAIT=true
+```
+
+### Using Custom Images with Clusters
+
+Once your custom image is built, you can reference it in your cluster configuration by updating the `Image` section in the generated cluster configuration file:
+
+```yaml
+Image:
+  CustomAmi: ami-0123456789abcdef0  # Your custom AMI ID
+```
+
+Or set it in your Terraform variables to have it automatically included in the generated configuration.
 
 ## 📋 Generated Cluster Configuration
 
@@ -112,33 +143,44 @@ Image:
   CustomAmi: ami-0123456789abcdef0
 ```
 
-## 🔧 Available Scripts
-
-### Terraform Template Generation
-- ✅ Automatic generation during `terraform apply`
-- ✅ Consistent with infrastructure state
-- ✅ Support for custom AMI configuration
+## 🔧 Available Makefile Commands
 
 ```bash
+# Show all available commands
+make help
+
+# Setup initial configuration
+make setup
+
+# Check prerequisites
+make check-prereqs
+
+# Deploy infrastructure
+make apply
+
+# Generate configuration files
 make generate-config
-```
 
-## 📁 File Structure
+# Validate configuration
+make validate-config
 
-```
-aws-parallelcluster/
-├── terraform/
-│   ├── main.tf                          # Infrastructure definition
-│   ├── outputs.tf                       # Terraform outputs
-│   ├── variables.tf                     # Configurable variables
-│   ├── terraform.tfvars.example         # Example configuration
-│   └── cluster-config-template.yaml     # Template for generation
-├── scripts/
-│   ├── build-custom-image.sh            # Custom image builder script
-│   └── README.md                        # Script documentation
-└── pcluster/
-    ├── cluster-config.yaml              # Original example
-    └── cluster-config-generated.yaml    # Auto-generated (created)
+# Create a cluster
+make create-cluster NAME=mycluster
+
+# SSH to cluster head node
+make ssh NAME=mycluster
+
+# Delete a cluster
+make delete-cluster NAME=mycluster
+
+# Show infrastructure and cluster status
+make status
+
+# Show Terraform outputs
+make outputs
+
+# Destroy all infrastructure
+make destroy
 ```
 
 ## 🚀 Deployment Workflow
@@ -147,31 +189,33 @@ aws-parallelcluster/
 
 1. **Configure Terraform**:
    ```bash
-   cd terraform
-   cp terraform.tfvars.example terraform.tfvars
-   vim terraform.tfvars  # Edit your settings
+   make setup
+   vim terraform/terraform.tfvars  # Edit your settings
    ```
 
-2. **Deploy Infrastructure**:
+2. **Deploy Infrastructure and Generate Config**:
    ```bash
-   terraform init
-   terraform plan
-   terraform apply
+   make apply
    ```
 
 3. **Validate Configuration**:
    ```bash
-   pcluster create-cluster \
-     --cluster-name my-research-cluster \
-     --cluster-configuration ../pcluster/cluster-config-generated.yaml \
-     --dryrun true
+   make validate-config
    ```
 
 4. **Deploy Cluster**:
    ```bash
-   pcluster create-cluster \
-     --cluster-name my-research-cluster \
-     --cluster-configuration cluster-config-generated.yaml
+   make create-cluster NAME=my-research-cluster
+   ```
+
+5. **Monitor Cluster Status**:
+   ```bash
+   make status
+   ```
+
+6. **Connect to Cluster**:
+   ```bash
+   make ssh NAME=my-research-cluster
    ```
 
 ## 🔍 Troubleshooting
@@ -181,14 +225,13 @@ aws-parallelcluster/
 **❌ "Terraform state file not found"**
 ```bash
 # Solution: Deploy infrastructure first
-terraform apply
+make apply
 ```
 
 **❌ "Could not retrieve subnet ID"**
 ```bash
 # Check Terraform outputs
-terraform output
-terraform output head_node_subnet_id
+make outputs
 ```
 
 **❌ "SSH key 'xyz' does not exist"**
@@ -203,25 +246,7 @@ make generate-config
 **❌ "Invalid cluster configuration"**
 ```bash
 # Validate before deployment
-pcluster validate-cluster-configuration \
-  --cluster-configuration cluster-config-generated.yaml
-```
-
-### Debug Commands:
-
-```bash
-# Check all Terraform outputs
-cd terraform && terraform output
-
-# Check specific resource
-terraform output efs_file_system_id
-
-# Test AWS connectivity
-aws sts get-caller-identity
-
-# Validate cluster config
-pcluster validate-cluster-configuration \
-  --cluster-configuration cluster-config-generated.yaml
+make validate-config
 ```
 
 ## 🔐 Security Best Practices
@@ -267,9 +292,8 @@ ComputeResources:
 
 ### Updating Infrastructure:
 1. Modify `terraform.tfvars`
-2. Run `terraform plan` to review changes
-3. Run `terraform apply`
-4. Regenerate cluster config if needed
+2. Run `make apply`
+3. Regenerate cluster config if needed with `make generate-config`
 
 ### Updating Cluster Configuration:
 1. Modify the generated YAML file
