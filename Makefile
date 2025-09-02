@@ -130,7 +130,8 @@ status: ## Show status of infrastructure and clusters
 	fi
 	@echo ""
 	@echo "=== ParallelCluster Status ==="
-	@$(VENV_ACTIVATE) && pcluster list-clusters --query 'clusters[].{Name:clusterName,Status:clusterStatus}' 2>/dev/null || echo "No clusters found or pcluster CLI not configured"
+	@echo "CLUSTER_NAME STATUS REGION VERSION SCHEDULER" | column -t
+	@$(VENV_ACTIVATE) && pcluster list-clusters --query "clusters" 2>/dev/null | jq -r '.[] | [.clusterName, .clusterStatus, .region, .version, .scheduler.type] | @tsv' | column -t || echo "No clusters found or pcluster CLI not configured"
 	@echo ""
 	@echo "=== Custom Images Status ==="
 	@echo "IMAGE_ID IMAGEBUILDSTATUS AMI_ID REGION" | column -t
@@ -205,7 +206,7 @@ dev-cluster: ## Create development cluster with default name
 	$(MAKE) create-cluster NAME=dev-pcluster
 
 dev-ssh: ## SSH to development cluster
-	$(MAKE) ssh-cluster NAME=dev-pcluster
+	$(MAKE) ssh NAME=dev-pcluster
 
 dev-delete: ## Delete development cluster with default name
 	$(MAKE) delete-cluster NAME=dev-pcluster
