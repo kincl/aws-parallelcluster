@@ -184,7 +184,7 @@ check-prereqs: ## Check if required tools are installed
 	@aws sts get-caller-identity >/dev/null 2>&1 && echo "✅ AWS credentials configured" || echo "❌ AWS credentials not configured - run 'aws configure'"
 
 # Full deployment workflow
-deploy: init plan apply generate-config validate-config ## Complete deployment workflow (init -> plan -> apply -> generate-config -> validate-config)
+deploy: init apply validate-config ## Complete deployment workflow (init -> apply -> validate-config)
 	@echo ""
 	@echo "🎉 Deployment completed successfully!"
 	@echo ""
